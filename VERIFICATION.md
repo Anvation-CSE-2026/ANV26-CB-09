@@ -12,7 +12,7 @@ The current application was checked in presentation mode: built React assets, Fa
 | pytest PostgreSQL/API/backup/engine checks | 70 passed |
 | Playwright browser checks | 10 passed |
 | Local readiness | 6/6 passed |
-| Whitespace/diff check | Passed |
+| Source/documentation whitespace check | Passed; generated graph bundle contains shader-string trailing whitespace |
 | Current schema-006 backup recovery drill | 8,063 rows exactly compared across 20 persistent tables |
 | Actual schema-005 archive recovery drill | 7,967 rows exactly compared across 20 persistent tables |
 
