@@ -1,0 +1,97 @@
+"""Archived tests for the retired email routes, no longer exposed by the app."""
+from datetime import timedelta
+import smtplib
+import pytest
+from sqlalchemy import select, delete
+from backend.tests.test_organisations import client, test_db, workspace, register, PASSWORD, login
+from backend.app import recovery
+from backend.app.database import RecoveryEmail, EmailAction, WorkspaceSession, AuthThrottle, now
+from backend.app.auth import digest
+
+
+@pytest.fixture
+def mail(workspace, monkeypatch):
+    client, factory = workspace
+    deliveries = []
+    monkeypatch.setattr(recovery, "configured", lambda: True)
+    monkeypatch.setattr(recovery, "send_link", lambda email, purpose, token: deliveries.append((email, purpose, token)))
+    return client, factory, deliveries
+
+
+def set_email(client, deliveries, email="operator@example.test"):
+    sent = client.post("/api/org/recovery/email", json={"email": email, "password": PASSWORD})
+    assert sent.status_code == 200, sent.text
+    token = deliveries[-1][2]
+    assert client.post("/api/org/recovery/verify", json={"token": token}).status_code == 200
+    return token
+
+
+def test_recovery_requires_delivery_and_current_password(workspace, monkeypatch):
+    client, _ = workspace
+    register(client)
+    monkeypatch.setattr(recovery, "configured", lambda: False)
+    assert client.get("/api/org/recovery/config").json() == {"deliveryConfigured": False}
+    assert client.post("/api/org/recovery/request", json={"email": "operator@example.test"}).status_code == 503
+    assert client.post("/api/org/recovery/email", json={"email": "operator@example.test", "password": PASSWORD}).status_code == 503
+    monkeypatch.setattr(recovery, "configured", lambda: True)
+    assert client.post("/api/org/recovery/email", json={"email": "operator@example.test", "password": "incorrect-password-2026"}).status_code == 401
+
+
+def test_verified_email_reset_is_single_use_and_revokes_sessions(mail):
+    client, factory, deliveries = mail
+    username, registered = register(client)
+    verify_token = set_email(client, deliveries)
+    assert client.post("/api/org/recovery/verify", json={"token": verify_token}).status_code == 400
+    status = client.get("/api/org/recovery/email").json()
+    assert status["email"] == "operator@example.test" and status["verifiedAt"]
+    unknown = client.post("/api/org/recovery/request", json={"email": "unknown@example.test"})
+    known = client.post("/api/org/recovery/request", json={"email": "operator@example.test"})
+    assert unknown.json() == known.json() and unknown.status_code == known.status_code == 200
+    token = deliveries[-1][2]
+    with factory() as db:
+        action = db.get(EmailAction, digest(token))
+        assert action and token not in action.token_hash and action.used_at is None
+    assert client.post("/api/org/recovery/reset", json={"token": token, "password": "short"}).status_code == 422
+    assert client.post("/api/org/recovery/reset", json={"token": token, "password": "A-new-test-password-2026"}).status_code == 200
+    assert client.get("/api/org/me").status_code == 401
+    with factory() as db:
+        assert not db.scalars(select(WorkspaceSession).where(WorkspaceSession.account_id == registered["accountId"])).all()
+    assert client.post("/api/org/recovery/reset", json={"token": token, "password": PASSWORD}).status_code == 400
+    assert client.post("/api/org/login", json={"username": username, "password": PASSWORD}).status_code == 401
+    assert client.post("/api/org/login", json={"username": username, "password": "A-new-test-password-2026"}).status_code == 200
+
+
+def test_unverified_replaced_and_expired_tokens_cannot_reset(mail):
+    client, factory, deliveries = mail
+    register(client)
+    assert client.post("/api/org/recovery/email", json={"email": "pending@example.test", "password": PASSWORD}).status_code == 200
+    before = len(deliveries)
+    assert client.post("/api/org/recovery/request", json={"email": "pending@example.test"}).status_code == 200
+    assert len(deliveries) == before
+    client.post("/api/org/recovery/verify", json={"token": deliveries[-1][2]})
+    client.post("/api/org/recovery/request", json={"email": "pending@example.test"})
+    old_reset = deliveries[-1][2]
+    set_email(client, deliveries, "changed@example.test")
+    assert client.post("/api/org/recovery/reset", json={"token": old_reset, "password": PASSWORD}).status_code == 400
+    client.post("/api/org/recovery/request", json={"email": "changed@example.test"})
+    expired = deliveries[-1][2]
+    with factory.begin() as db:
+        db.get(EmailAction, digest(expired)).expires_at = now() - timedelta(seconds=1)
+    assert client.post("/api/org/recovery/reset", json={"token": expired, "password": PASSWORD}).status_code == 400
+
+
+def test_mail_failure_rolls_back_and_never_reveals_account_existence(mail, monkeypatch):
+    client, factory, deliveries = mail
+    register(client)
+    set_email(client, deliveries, "mail-failure@example.test")
+    def failure(*args):
+        raise smtplib.SMTPException("test-only simulated transport failure")
+    monkeypatch.setattr(recovery, "send_link", failure)
+    known = client.post("/api/org/recovery/request", json={"email": "mail-failure@example.test"})
+    unknown = client.post("/api/org/recovery/request", json={"email": "unknown@example.test"})
+    assert known.json() == unknown.json()
+    assert client.post("/api/org/recovery/email", json={"email": "other@example.test", "password": PASSWORD}).status_code == 503
+    assert client.get("/api/org/recovery/email").json()["email"] == "mail-failure@example.test"
+    for i in range(15):
+        response = client.post("/api/org/recovery/request", json={"email": "unknown@example.test"})
+    assert response.status_code == 429

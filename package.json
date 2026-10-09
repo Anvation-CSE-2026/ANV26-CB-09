@@ -1,0 +1,48 @@
+{
+  "name": "identity-lens",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/dev.mjs",
+    "dev": "node scripts/dev.mjs",
+    "present": "node scripts/dev.mjs --presentation",
+    "doctor": "node scripts/doctor.mjs",
+    "setup": "node scripts/setup.mjs",
+    "seed:export": "node scripts/export-seed.mjs",
+    "build": "tsc --noEmit && vite build",
+    "test": "node --test tests/*.test.mjs && vitest run",
+    "test:api": "backend/.venv/bin/python -m pytest backend/tests -q",
+    "test:e2e": "playwright test",
+    "db": "node scripts/postgres.mjs",
+    "db:backup": "node scripts/backup.mjs create",
+    "db:verify-backup": "node scripts/backup.mjs verify",
+    "db:restore": "node scripts/backup.mjs restore",
+    "registration:configure": "node scripts/registration.mjs configure",
+    "registration:connect": "node scripts/registration.mjs connect",
+    "registration:start": "node scripts/registration.mjs start"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/manrope": "^5.3.0",
+    "cytoscape": "^3.34.3",
+    "lucide-react": "^1.53.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/cytoscape": "^3.21.9",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "prettier": "^3.9.9",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  }
+}

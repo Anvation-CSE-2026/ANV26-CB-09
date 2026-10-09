@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connected registration · Identity Lens</title>
+    <link rel="stylesheet" href="/registration.css" />
+  </head>
+  <body>
+    <header>
+      <span class="brand"
+        >Identity Lens <span class="small">/ Connected registration</span></span
+      ><a href="http://localhost:4173/" target="_blank" rel="noreferrer"
+        >Open analyst workspace ↗</a
+      >
+    </header>
+    <main>
+      <div class="intro">
+        <div class="eyebrow">
+          Separate registration backend · localhost only
+        </div>
+        <h1>Submit evidence through a real connection.</h1>
+        <p>
+          This standalone form talks to its own server. That server sends
+          fictional applicant records to your organisation’s Identity Lens
+          workspace using a private integration key.
+        </p>
+      </div>
+      <div class="grid">
+        <section class="panel">
+          <h2>Synthetic applicant registration</h2>
+          <div class="notice">
+            Use invented IDs and tokens only. Values below are supplied
+            synthetic observations—not phone verification, device attestation or
+            live behaviour measurements. This page does not run the browser
+            collector.
+          </div>
+          <form id="registration">
+            <div class="section">
+              <div class="fields">
+                <label
+                  >Applicant ID<input
+                    name="external_id"
+                    required
+                    pattern="[A-Za-z0-9._\-]+"
+                    maxlength="64"
+                    placeholder="FICTIONAL-001" /></label
+                ><label
+                  >Registration timestamp<input
+                    id="registered"
+                    name="registered_at"
+                    type="datetime-local"
+                    step="0.001"
+                    required /></label
+                ><label
+                  >Declared region<select name="region">
+                    <option value="">Unknown</option>
+                    <option>North</option>
+                    <option>South</option>
+                    <option>East</option>
+                    <option>West</option>
+                  </select></label
+                ><label
+                  >Birth year<input
+                    name="birth_year"
+                    type="number"
+                    min="1900"
+                    max="2026"
+                    placeholder="Unknown" /></label
+                ><label
+                  >Supplied email age (days)<input
+                    name="email_age_days"
+                    type="number"
+                    min="0"
+                    max="36500"
+                    placeholder="Unknown" /></label
+                ><label
+                  >Supplied phone verification<select name="phone_verified">
+                    <option value="">Unknown</option>
+                    <option value="true">Verified in fictional source</option>
+                    <option value="false">
+                      Unverified in fictional source
+                    </option>
+                  </select></label
+                ><label
+                  >Phone token<input
+                    name="phone_token"
+                    pattern="PHONE-[A-Z0-9\-]+"
+                    placeholder="PHONE-FICTIONAL-001" /></label
+                ><label
+                  >Address token<input
+                    name="address_token"
+                    pattern="ADDR-[A-Z0-9\-]+"
+                    placeholder="ADDR-FICTIONAL-001"
+                /></label>
+              </div>
+            </div>
+            <details class="section">
+              <summary>Optional supplied device checks</summary>
+              <div class="fields">
+                <label
+                  >Emulated environment<select name="emulated_device">
+                    <option value="">Unknown</option>
+                    <option value="true">Yes in fictional source</option>
+                    <option value="false">No in fictional source</option>
+                  </select></label
+                ><label
+                  >Attribute mismatch<select name="device_mismatch">
+                    <option value="">Unknown</option>
+                    <option value="true">Yes in fictional source</option>
+                    <option value="false">No in fictional source</option>
+                  </select></label
+                >
+              </div>
+            </details>
+            <div class="section">
+              <label class="check"
+                ><input name="add_session" type="checkbox" />Attach a supplied
+                synthetic session</label
+              >
+              <p class="small">
+                Without a session, Identity Lens will retain the record as
+                Pending. These counts are not measured from your interaction
+                with this form.
+              </p>
+              <div class="fields">
+                <label
+                  >Device token<input
+                    name="device_token"
+                    pattern="DEV-[A-Z0-9\-]+"
+                    placeholder="DEV-FICTIONAL-001" /></label
+                ><label
+                  >Observed region<select name="observed_region">
+                    <option value="">Unknown</option>
+                    <option>North</option>
+                    <option>South</option>
+                    <option>East</option>
+                    <option>West</option>
+                  </select></label
+                ><label
+                  >Supplied form duration (seconds)<input
+                    name="form_seconds"
+                    type="number"
+                    min="0"
+                    max="1800"
+                    step="any"
+                    placeholder="Unknown" /></label
+                ><label
+                  >Supplied field changes<input
+                    name="edit_count"
+                    type="number"
+                    min="0"
+                    max="200"
+                    placeholder="Unknown" /></label
+                ><label
+                  >Supplied failed sign-ins<input
+                    name="failed_attempts"
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder="Unknown"
+                /></label>
+              </div>
+            </div>
+            <label class="check"
+              ><input id="fictional" type="checkbox" required />I confirm these
+              applicant observations are fictional.</label
+            ><button id="submit" disabled>Submit registration</button>
+            <div id="result" role="status" hidden></div>
+          </form>
+        </section>
+        <aside class="panel">
+          <div class="eyebrow">Where this submission goes</div>
+          <h2>Organisation connection</h2>
+          <p id="connection" class="status" role="status">
+            Checking the server connection…
+          </p>
+          <button id="refresh-connection" type="button">
+            Refresh connection
+          </button>
+          <ol class="steps">
+            <li>Your fictional profile goes to the registration server.</li>
+            <li>
+              The server authenticates to Identity Lens. Its secret never
+              reaches this page.
+            </li>
+            <li>
+              Identity Lens saves the record and any supplied session, then
+              calculates the assessment.
+            </li>
+            <li>
+              Your analyst opens Investigations and Refresh to inspect it.
+            </li>
+          </ol>
+          <p class="small">
+            The registration response does not expose internal fraud scores or
+            relationship graphs. Retry the same ID and values if delivery is
+            uncertain; identical observations will not be duplicated.
+          </p>
+          <p class="small">
+            This is an implemented integration example, not a connected external
+            verification provider or a production customer onboarding/KYC
+            service.
+          </p>
+        </aside>
+      </div>
+      <footer>
+        Explicit synthetic submissions only · No background visitor measurement
+        or automatic denial.
+      </footer>
+    </main>
+    <script src="/registration.js" defer></script>
+  </body>
+</html>

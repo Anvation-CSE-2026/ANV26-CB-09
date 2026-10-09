@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Identity Lens · API reference</title>
+    <link rel="stylesheet" href="/api-reference.css" />
+    <script defer src="/api-reference.js"></script>
+  </head>
+  <body>
+    <header>
+      <a href="/">Identity Lens</a><span>Developer reference</span>
+    </header>
+    <main>
+      <div class="eyebrow">Generated from the running API</div>
+      <h1>Connect evidence. Keep access scoped.</h1>
+      <p>
+        Create a server key under Connections. Send fictional applicant records
+        and session events from your backend—not directly from browser code.
+        Account routes use HttpOnly sessions; ingestion routes use a private
+        X-Lens-Key header.
+      </p>
+      <aside>
+        This reference is read-only and works without external scripts or an
+        internet connection. It describes schemas, not saved case records.
+        Hosted activity is notice-gated on fictional applicant records.
+        External-site measurement remains off; real identity data, production
+        KYC and automatic denial are outside this application’s submission
+        scope.
+      </aside>
+      <label
+        >Find an endpoint<input
+          id="search"
+          type="search"
+          placeholder="Search paths, methods or tags"
+      /></label>
+      <p id="status" role="status">Loading the current API schema…</p>
+      <section id="endpoints" aria-label="API endpoints"></section>
+      <details>
+        <summary>Data schemas</summary>
+        <section id="schemas"></section>
+      </details>
+      <footer>
+        <a href="/openapi.json">View the generated OpenAPI JSON</a> · No
+        credentials are entered or transmitted by this page.
+      </footer>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,194 @@
+"""Archived reference only. Email recovery is not imported or mounted by the application."""
+from datetime import timedelta
+from email.message import EmailMessage
+import logging
+import re
+import secrets
+import smtplib
+import ssl
+from urllib.parse import urlsplit
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import select, update, delete
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from .config import settings
+from .database import Account, RecoveryEmail, EmailAction, WorkspaceSession, Membership, get_db, now
+from .auth import digest
+from .workspaces import principal, throttle, verify_password, hash_password, audit, utc
+
+router = APIRouter(prefix="/api/org/recovery", tags=["Operator account recovery"])
+logger = logging.getLogger("identity_lens")
+GENERIC = {"message": "If this address is verified for an account, a reset link will be emailed. Check your inbox."}
+
+
+def configured():
+    parsed = urlsplit(settings.recovery_base_url)
+    valid = parsed.scheme == "https" or (parsed.scheme == "http" and parsed.hostname in ("localhost", "127.0.0.1"))
+    return bool(settings.smtp_host and settings.smtp_from and valid and not parsed.query and not parsed.fragment and not parsed.username)
+
+
+def require_delivery():
+    if not configured():
+        raise HTTPException(503, "Email recovery is not connected yet. Configure the server's SMTP settings and trusted application URL.")
+
+
+def send_link(email, purpose, token):
+    # Fixed deployment configuration: never trust a request Host header for reset links.
+    url = settings.recovery_base_url.rstrip("/") + "/#" + purpose + "=" + token
+    message = EmailMessage()
+    message["From"] = settings.smtp_from
+    message["To"] = email
+    message["Subject"] = "Identity Lens: " + ("verify recovery email" if purpose == "verify" else "reset password")
+    message.set_content("Open this single-use link within 20 minutes:\n\n" + url + "\n\nIf you did not request this, ignore this message. Never share this link.")
+    context = ssl.create_default_context()
+    # There is no plaintext SMTP fallback or browser-visible development outbox.
+    transport = smtplib.SMTP_SSL if settings.smtp_use_ssl else smtplib.SMTP
+    with transport(settings.smtp_host, settings.smtp_port, timeout=15, **({"context": context} if settings.smtp_use_ssl else {})) as smtp:
+        if not settings.smtp_use_ssl:
+            smtp.ehlo()
+            smtp.starttls(context=context)
+            smtp.ehlo()
+        if settings.smtp_username:
+            smtp.login(settings.smtp_username, settings.smtp_password)
+        smtp.send_message(message)
+
+
+class EmailInput(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("email")
+    @classmethod
+    def email_format(cls, value):
+        value = value.strip().lower()
+        if not re.fullmatch(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}", value) or ".." in value:
+            raise ValueError("Enter a valid email address.")
+        return value
+
+
+class VerifyRequest(EmailInput):
+    password: str = Field(min_length=12, max_length=128)
+
+
+class ActionInput(BaseModel):
+    token: str = Field(pattern=r"^[A-Za-z0-9_-]{40,80}$")
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResetInput(ActionInput):
+    password: str = Field(min_length=12, max_length=128)
+
+
+def invalidate(db, account_id):
+    db.execute(update(EmailAction).where(EmailAction.account_id == account_id, EmailAction.used_at.is_(None)).values(used_at=now()))
+
+
+def issue(db, account_id, email, purpose):
+    # The account row is locked by the caller, serialising concurrent issuance/consumption.
+    token = secrets.token_urlsafe(32)
+    db.execute(update(EmailAction).where(EmailAction.account_id == account_id, EmailAction.purpose == purpose, EmailAction.used_at.is_(None)).values(used_at=now()))
+    db.add(EmailAction(token_hash=digest(token), account_id=account_id, email=email, purpose=purpose, expires_at=now() + timedelta(minutes=20)))
+    db.flush()
+    send_link(email, purpose, token)
+
+
+def account_audit(db, account_id, action):
+    for org_id in db.scalars(select(Membership.organisation_id).where(Membership.account_id == account_id, Membership.active.is_(True))):
+        audit(db, org_id, account_id, action)
+
+
+def action_account(db, token, purpose):
+    action = db.get(EmailAction, digest(token))
+    if not action:
+        raise HTTPException(400, "This link is invalid or expired. Request a new link.")
+    account = db.scalar(select(Account).where(Account.id == action.account_id).with_for_update())
+    # Re-read after acquiring the shared per-account lock to prevent parallel redemption.
+    db.refresh(action)
+    if not account or action.purpose != purpose or action.used_at or utc(action.expires_at) <= now():
+        raise HTTPException(400, "This link is invalid or expired. Request a new link.")
+    return action, account
+
+
+@router.get("/config")
+def delivery_config():
+    return {"deliveryConfigured": configured()}
+
+
+@router.get("/email")
+def email_status(db: Session = Depends(get_db), current=Depends(principal)):
+    record = db.get(RecoveryEmail, current["id"])
+    return {"email": record.email if record else None, "verifiedAt": record.verified_at if record else None, "deliveryConfigured": configured()}
+
+
+@router.post("/email")
+def verification_request(data: VerifyRequest, request: Request, db: Session = Depends(get_db), current=Depends(principal)):
+    require_delivery()
+    throttle(db, request)
+    account = db.scalar(select(Account).where(Account.id == current["id"]).with_for_update())
+    if not verify_password(data.password, account.password_hash):
+        raise HTTPException(401, "Confirm your current password to change your recovery email.")
+    existing = db.scalar(select(RecoveryEmail).where(RecoveryEmail.email == data.email))
+    if existing and existing.account_id != account.id:
+        raise HTTPException(409, "This recovery address is unavailable.")
+    try:
+        issue(db, account.id, data.email, "verify")
+        db.commit()
+    except (OSError, smtplib.SMTPException):
+        db.rollback()
+        raise HTTPException(503, "The email service could not deliver your verification link. Try again later.")
+    return {"message": "Verification link sent. Your existing recovery email stays unchanged until you confirm the new address."}
+
+
+@router.post("/verify")
+def verify_email(data: ActionInput, request: Request, db: Session = Depends(get_db)):
+    throttle(db, request)
+    action, account = action_account(db, data.token, "verify")
+    record = db.get(RecoveryEmail, account.id)
+    if record:
+        record.email, record.verified_at = action.email, now()
+    else:
+        db.add(RecoveryEmail(account_id=account.id, email=action.email))
+    invalidate(db, account.id)
+    account_audit(db, account.id, "recovery_email_verified")
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "This address is no longer available. Choose another address.")
+    return {"message": "Recovery email verified. You can now request password reset links."}
+
+
+@router.post("/request")
+def reset_request(data: EmailInput, request: Request, db: Session = Depends(get_db)):
+    require_delivery()
+    throttle(db, request)
+    record = db.scalar(select(RecoveryEmail).where(RecoveryEmail.email == data.email))
+    if record:
+        db.scalar(select(Account).where(Account.id == record.account_id).with_for_update())
+        db.refresh(record)
+        if record.email == data.email:
+            try:
+                issue(db, record.account_id, record.email, "reset")
+                db.commit()
+            except (OSError, smtplib.SMTPException):
+                db.rollback()
+                logger.warning("Password recovery delivery failed; no recipient or token logged.")
+    # Same status/body for unknown addresses and delivery failures. Transport timing is not guaranteed identical.
+    return GENERIC
+
+
+@router.post("/reset")
+def reset_password(data: ResetInput, request: Request, response: Response, db: Session = Depends(get_db)):
+    throttle(db, request)
+    action, account = action_account(db, data.token, "reset")
+    verified = db.get(RecoveryEmail, account.id)
+    if not verified or verified.email != action.email:
+        raise HTTPException(400, "This link is invalid or expired. Request a new link.")
+    account.password_hash = hash_password(data.password)
+    invalidate(db, account.id)
+    db.execute(delete(WorkspaceSession).where(WorkspaceSession.account_id == account.id))
+    account_audit(db, account.id, "password_reset")
+    db.commit()
+    response.delete_cookie("lens_workspace", path="/api")
+    return {"message": "Password changed. All account sessions have ended. Sign in again with your new password."}
