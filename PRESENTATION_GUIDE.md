@@ -3,11 +3,11 @@
 ## Start and check
 
 ```sh
-cd /Users/devaanshsinha/Documents/Codex/2026-10-08/rea/outputs/identity-lens
+cd ANV26-CB-09
 npm run present
 ```
 
-Keep Terminal open. From a second project Terminal run `npm run doctor`. Open **http://localhost:4173/** and sign into your organisation. Hosted activity needs no second website, external integration key, email service or paid API. The optional external connector is not auto-started.
+These commands assume the repository has been cloned and dependencies installed as described in README.md. Keep Terminal open. From a second project Terminal run `npm run doctor`. Open **http://localhost:4173/** and sign into your organisation. This is the local presentation address; use a verified HTTPS deployment URL only after the full stack is hosted. Hosted activity needs no second website, external integration key, email service or paid API. The optional external connector is not auto-started.
 
 Applicant identities remain fictional. The sample/benchmark datasets are generated. Hosted activity measures actual controlled-page interactions after acknowledgement and labels them client-reported. Do not call these measured observations generated data or verified identity. If judging rules require exclusively generated behavioural inputs, set `ALLOW_HOSTED_ACTIVITY=false` and restart, then present only the sample dataset.
 

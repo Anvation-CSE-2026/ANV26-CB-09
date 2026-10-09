@@ -1,29 +1,39 @@
-# Identity Lens — organisation evidence workspace
+# Identity Lens
 
-CY-04: Digital Identity Fraud & Synthetic Identity Detection (Pygenic Arc).
+Digital identity fraud and synthetic identity detection (pygenic arc)
+
+**Challenge:** CY-04 · Anvation Hackathon 2026
 
 Organisations can create accounts, invite a team, add/import applicants, collect hosted page activity or connect an external server, investigate risk and retain review history. These operations use FastAPI and PostgreSQL, not hard-coded dashboard actions. The light interface and projector mode remain. **Sample cases**, **Hosted activity** and organisation investigations are inside one website. Sample and organisation records stay separate; `/sandbox` is a backward-compatible entry link, not a required second website.
 
 Applicant identities and verification inputs remain **fictional**. Sample datasets and benchmarks are synthetic. The optional hosted flow measures actual interactions with a controlled form after notice acknowledgement and labels those observations **hosted_client_reported**, not generated sample data. It collects no real personal identity information. Do not represent measured activity as wholly synthetic benchmark evidence. Scores are advisory evidence indices, not fraud probabilities or identity verification. No automatic approval, denial or production KYC is performed. If a submission must use exclusively generated behavioural data, disable `ALLOW_HOSTED_ACTIVITY` and present the sample dataset instead.
 
-## Start on this laptop
+## Repository and hosting
+
+This repository contains the React frontend, Python/FastAPI backend, PostgreSQL migrations, synthetic datasets, tests and operating instructions. GitHub stores the source code; a repository commit does not deploy the application.
+
+Vercel is the intended website host. The current `vercel.json` builds and serves the frontend from `dist/` only. Full application hosting also needs the Python API, persistent PostgreSQL, a same-origin `/api` connection and secure deployment settings. Importing this repository into Vercel alone does not make login, scoring or saved cases work. No deployment of this full-stack build is claimed.
+
+## Development setup
+
+Use Node.js 22+ and Python 3.14. Internet access is needed to install dependencies. From a new working folder:
 
 ```sh
-cd /Users/devaanshsinha/Documents/Codex/2026-10-08/rea/outputs/identity-lens
+git clone https://github.com/Anvation-CSE-2026/ANV26-CB-09.git
+cd ANV26-CB-09
+npm ci
+npm run setup
 npm run present
 ```
 
-Open **http://localhost:4173** and sign into your existing organisation. New users can create an organisation with a username and password of at least 12 characters. New organisations start empty. Under **Import evidence**, download the synthetic sample, upload it, preview validation and import it. The sample contains legitimate, ambiguous-household and suspicious cases. Records survive browser refreshes and application restarts. Use [PRESENTATION_GUIDE.md](PRESENTATION_GUIDE.md) for the walkthrough.
+For local development, open **http://localhost:4173**. This address refers to the machine running the app, not a public website. Create an organisation with a username and password of at least 12 characters. New organisations start empty; accounts and organisation records from another installation are not included in Git. Under **Import evidence**, download the synthetic sample, upload it, preview validation and import it. The sample contains legitimate, ambiguous-household and suspicious cases. Records survive browser refreshes and application restarts. Use [PRESENTATION_GUIDE.md](PRESENTATION_GUIDE.md) for the walkthrough.
 
 One command starts native PostgreSQL on loopback port 55432, applies Alembic migrations, builds the frontend, starts FastAPI on port 8000 and serves the built app through a loopback proxy on port 4173. Hosted applicant activity runs in this website and requires no separate integration key or port-4180 service. No hot reload or internet connection is required for presentation. Stop with Ctrl+C; data is retained. `npm start` uses Vite instead for development. Stop the current mode before switching. `npm run doctor` checks local readiness, not fraud accuracy.
 
-For a fresh checkout, use Node.js 22+ and Python 3.14:
+Browser-test installation is optional for running the application:
 
 ```sh
-npm ci
-npm run setup
 npx playwright install chromium
-npm start
 ```
 
 An external `DATABASE_URL` skips the embedded PostgreSQL runner. `.env.example` documents settings; `.env` is excluded from Git. No Supabase, Docker, cloud account or paid API is required by this local application.
@@ -150,7 +160,7 @@ Keep either startup mode running for API/browser tests; do not restart PostgreSQ
 
 ## Deployment and limits
 
-This build runs locally, not redeployed to Vercel. The earlier public static site is unchanged and does not automatically acquire backend features. `dist/` alone is insufficient: public operation requires hosted Python/PostgreSQL, HTTPS, secure cookies, configured origins/host and deployment verification.
+The current full-stack build has been verified locally. Its Vercel frontend configuration is not a complete backend deployment. Public operation requires hosted Python/PostgreSQL, same-origin API routing, HTTPS, secure cookies, configured origins/host and end-to-end deployment verification. An earlier static deployment does not automatically acquire these backend features.
 
 Before use with real applicants: approved evidence sources/validation, an authorised privacy/retention policy and account-recovery process, MFA/enterprise identity, HTTPS deployment, encrypted off-device backups, monitoring/alerting, load testing and independent security review are still needed. Intake is bounded to 1,000 applicants/organisation, 100 sessions/applicant, 100 applicants and 1.5 MB/import. Hosted activity allows at most five active links/applicant and 200 active links/organisation; only the most recent 100 are listed. Scoring is synchronous and the frontend loads a bounded population, not a high-volume streaming platform. Unchanged assessments do not multiply history on unrelated intake. Audit records have no edit/delete API but are not tamper-evident against database administrators. Logs are bounded private local diagnostics, not cloud monitoring. API failures use safe messages with request references. Account/evidence/link retention still needs a deployment-specific policy. Hosted expiry and elapsed-duration checks limit obvious invalid reports but cannot prevent a malicious client from spoofing observations.
 
