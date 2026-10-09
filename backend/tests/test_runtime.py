@@ -69,3 +69,9 @@ def test_private_log_rotation_keeps_every_file_private(tmp_path):
         assert all(path.stat().st_mode & 0o777 == 0o600 for path in files)
     finally:
         handler.close()
+
+
+def test_serverless_assets_work_without_frontend_source_files(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "ASSETS_SOURCE", tmp_path / "not-bundled")
+    for path in ("/identity-lens.js", "/docs", "/api-reference.js", "/api-reference.css"):
+        assert client.get(path).status_code == 200

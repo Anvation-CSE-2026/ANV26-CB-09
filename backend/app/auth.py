@@ -15,11 +15,11 @@ def user(request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get("lens_session", "")
     record = db.get(AuthSession, digest(token)) if token else None
     if not record:
-        raise HTTPException(401, "Enter the demo workspace to continue.")
+        raise HTTPException(401, "Open the sample workspace to continue.")
     expiry = record.expires_at
     expiry = expiry.replace(tzinfo=timezone.utc) if expiry.tzinfo is None else expiry.astimezone(timezone.utc)
     if expiry <= datetime.now(timezone.utc):
-        raise HTTPException(401, "Enter the demo workspace to continue.")
+        raise HTTPException(401, "Open the sample workspace to continue.")
     return {"name": record.actor, "role": record.role, "id": record.actor}
 
 
@@ -30,8 +30,11 @@ def analyst(current=Depends(user)):
 
 
 def demo_login(request: Request, response: Response, db: Session, role="analyst"):
-    if request.client.host not in ("127.0.0.1", "::1", "testclient"):
-        raise HTTPException(403, "Local demo access is unavailable.")
+    if settings.allow_public_samples:
+        # Published examples are inspectable, but cannot grant anonymous analyst writes.
+        role = "viewer"
+    elif request.client.host not in ("127.0.0.1", "::1", "testclient"):
+        raise HTTPException(403, "Local sample access is unavailable.")
     token = secrets.token_urlsafe(32)
     actor = "Demo analyst" if role == "analyst" else "Demo viewer"
     expires = datetime.now(timezone.utc) + timedelta(hours=8)

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, String, ForeignKey, JSON, Integer, DateTime, Index, UniqueConstraint, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.pool import NullPool
+import os
 from .config import settings
 
 
@@ -270,7 +272,8 @@ class EmailAction(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+cloud_options = {"poolclass": NullPool, "connect_args": {"prepare_threshold": None}} if os.environ.get("VERCEL") == "1" else {}
+engine = create_engine(settings.database_url, pool_pre_ping=True, **cloud_options)
 SessionLocal = sessionmaker(bind=engine)
 
 

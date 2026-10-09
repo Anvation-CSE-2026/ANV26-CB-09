@@ -82,9 +82,11 @@ export function Breakdown({ result }: { result: Assessment }) {
 function Login({
   onLogin,
   onOrganisation,
+  readOnly,
 }: {
   onLogin: () => void;
   onOrganisation: () => void;
+  readOnly: boolean;
 }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -94,7 +96,7 @@ function Login({
     try {
       await api("/auth/sample", {
         method: "POST",
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ role: readOnly ? "viewer" : role }),
       });
       onLogin();
     } catch (e) {
@@ -125,6 +127,7 @@ function Login({
               <p>
                 Sample evidence workspace. All profiles, devices and activity
                 are synthetic.
+                {readOnly && " Public sample cases have read-only access."}
               </p>
             </div>
             <button
@@ -134,13 +137,15 @@ function Login({
             >
               {busy ? "Opening workspace…" : "Open sample cases"}
             </button>
-            <button
-              className="btn w-full mt-3"
-              disabled={busy}
-              onClick={() => login("viewer")}
-            >
-              Explore with read-only access
-            </button>
+            {!readOnly && (
+              <button
+                className="btn w-full mt-3"
+                disabled={busy}
+                onClick={() => login("viewer")}
+              >
+                Explore with read-only access
+              </button>
+            )}
           </>
         }
         {error && (
@@ -159,6 +164,7 @@ function Login({
 
 export function App({ onOrganisation }: { onOrganisation: () => void }) {
   const [intakeOpen, setIntakeOpen] = useState(false);
+  const [sampleReadOnly, setSampleReadOnly] = useState(false);
   const [data, setData] = useState<Bootstrap | null>(null),
     [loading, setLoading] = useState(true),
     [authRequired, setAuthRequired] = useState(false),
@@ -195,9 +201,12 @@ export function App({ onOrganisation }: { onOrganisation: () => void }) {
     setLoading(true);
     setError("");
     try {
-      const config = await api<{ mode: string; user: User | null }>(
-        "/auth/config",
-      );
+      const config = await api<{
+        mode: string;
+        user: User | null;
+        publicSampleReadOnly?: boolean;
+      }>("/auth/config");
+      setSampleReadOnly(Boolean(config.publicSampleReadOnly));
       if (!config.user) {
         setAuthRequired(true);
         setData(null);
@@ -277,7 +286,13 @@ export function App({ onOrganisation }: { onOrganisation: () => void }) {
       </main>
     );
   if (authRequired || !data)
-    return <Login onLogin={load} onOrganisation={onOrganisation} />;
+    return (
+      <Login
+        onLogin={load}
+        onOrganisation={onOrganisation}
+        readOnly={sampleReadOnly}
+      />
+    );
   const p = data.population.find((p) => p.id === selected)!,
     r = results.get(selected)!;
   const navItems: [View, string, typeof Search][] = [

@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -8,9 +9,20 @@ class Settings(BaseSettings):
     allow_browser_telemetry: bool = False
     allow_hosted_activity: bool = True
     enable_sandbox: bool = True
+    allow_public_samples: bool = False
     public_host: str = ""
     runtime_mode: str = "development"
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def use_psycopg_driver(cls, value):
+        # Cloud providers supply standard PostgreSQL URLs; never log their secrets.
+        if isinstance(value, str):
+            for prefix in ("postgres://", "postgresql://"):
+                if value.startswith(prefix):
+                    return "postgresql+psycopg://" + value[len(prefix):]
+        return value
 
 
 settings = Settings()

@@ -4,6 +4,8 @@ Digital identity fraud and synthetic identity detection (pygenic arc)
 
 **Challenge:** CY-04 · Anvation Hackathon 2026
 
+**Live application:** [identity-lens.vercel.app](https://identity-lens.vercel.app/)
+
 Organisations can create accounts, invite a team, add/import applicants, collect hosted page activity or connect an external server, investigate risk and retain review history. These operations use FastAPI and PostgreSQL, not hard-coded dashboard actions. The light interface and projector mode remain. **Sample cases**, **Hosted activity** and organisation investigations are inside one website. Sample and organisation records stay separate; `/sandbox` is a backward-compatible entry link, not a required second website.
 
 Applicant identities and verification inputs remain **fictional**. Sample datasets and benchmarks are synthetic. The optional hosted flow measures actual interactions with a controlled form after notice acknowledgement and labels those observations **hosted_client_reported**, not generated sample data. It collects no real personal identity information. Do not represent measured activity as wholly synthetic benchmark evidence. Scores are advisory evidence indices, not fraud probabilities or identity verification. No automatic approval, denial or production KYC is performed. If a submission must use exclusively generated behavioural data, disable `ALLOW_HOSTED_ACTIVITY` and present the sample dataset instead.
@@ -12,7 +14,11 @@ Applicant identities and verification inputs remain **fictional**. Sample datase
 
 This repository contains the React frontend, Python/FastAPI backend, PostgreSQL migrations, synthetic datasets, tests and operating instructions. GitHub stores the source code; a repository commit does not deploy the application.
 
-Vercel is the intended website host. The current `vercel.json` builds and serves the frontend from `dist/` only. Full application hosting also needs the Python API, persistent PostgreSQL, a same-origin `/api` connection and secure deployment settings. Importing this repository into Vercel alone does not make login, scoring or saved cases work. No deployment of this full-stack build is claimed.
+The deployed application uses Vercel for the React interface and Python/FastAPI function, with Neon PostgreSQL for persistent storage. The frontend and `/api` share one HTTPS origin. Registration, sign-in, applicant intake, hosted activity receipt and saved reviews were checked against the deployed service. This verifies functionality, not real-world fraud accuracy or production certification.
+
+The hosted installation has its own database. Local accounts and private organisation records are not copied into it. Create a workspace online or use **Explore sample cases**. Public sample access is read-only; signed-in organisation members can work on their own cases according to their role.
+
+Deployment currently uses the Vercel CLI. A GitHub push alone should not be assumed to trigger a deployment until the Git integration is configured. See [DEPLOYMENT.md](DEPLOYMENT.md) for release settings and database migration requirements.
 
 ## Development setup
 
@@ -50,6 +56,7 @@ An external `DATABASE_URL` skips the embedded PostgreSQL runner. `.env.example` 
 | Validation | Pydantic | Strict schemas, timezone/chronology checks, limits, unknown-field rejection |
 | Assessment | Explicit Python rules, NumPy | Capped scores, registration bursts and robust median/MAD checks |
 | Database | PostgreSQL | Persistent accounts, evidence, assessments, imports, notes and audit |
+| Cloud hosting | Vercel, Neon PostgreSQL | Same-origin Python/frontend deployment and separate persistent hosted database |
 | Database access | SQLAlchemy, psycopg | Scoped queries, transactions, row locks and revision checks |
 | Schema | Alembic | Versioned migrations |
 | Account security | hashlib.scrypt, hashed opaque tokens, HttpOnly cookies | Password hashing, expiring sessions, integration keys and invitations |
@@ -94,7 +101,7 @@ Hosted collection is explicitly notice-gated (`ALLOW_HOSTED_ACTIVITY=true`) for 
 
 ## Storage
 
-Local database files: **`.local/postgres/`**, database **`identity_lens`**, excluded from Git. Do not delete this folder to resolve startup issues. Browser storage is not the evidence database.
+Local development database files: **`.local/postgres/`**, database **`identity_lens`**, excluded from Git. The hosted installation uses separate Neon PostgreSQL storage. Do not delete the local folder to resolve startup issues. Browser storage is not the evidence database, and Git contains no operator accounts, private cases or database credentials.
 
 `npm run db:backup` saves a private local logical backup and performs an exact-content recovery drill. `npm run db:restore` restores only into a NEW named database, never the live one. See [OPERATIONS.md](OPERATIONS.md) for recovery, permissions and limitations. Archives are not encrypted and must not be shared in submissions.
 
@@ -160,7 +167,9 @@ Keep either startup mode running for API/browser tests; do not restart PostgreSQ
 
 ## Deployment and limits
 
-The current full-stack build has been verified locally. Its Vercel frontend configuration is not a complete backend deployment. Public operation requires hosted Python/PostgreSQL, same-origin API routing, HTTPS, secure cookies, configured origins/host and end-to-end deployment verification. An earlier static deployment does not automatically acquire these backend features.
+The current full-stack build is deployed at the live URL above. Vercel uses Python 3.14, the root ASGI entrypoint and runtime requirements; the build also compiles the React assets. Secure cookies, a single configured public origin and read-only public samples are enabled. PostgreSQL migrations through schema 006 were applied to the new Neon database. Secrets are configured in Vercel, not committed to Git. This release replaces the earlier static-only website.
+
+Cloud functions use temporary private metadata-log files under `/tmp`; those files are not durable audit storage. Evidence, reviews and application audit records remain in PostgreSQL. Vercel/Neon may keep their own infrastructure logs under their provider policies; the SDK's collection exclusions do not mean the hosting providers collect no request metadata.
 
 Before use with real applicants: approved evidence sources/validation, an authorised privacy/retention policy and account-recovery process, MFA/enterprise identity, HTTPS deployment, encrypted off-device backups, monitoring/alerting, load testing and independent security review are still needed. Intake is bounded to 1,000 applicants/organisation, 100 sessions/applicant, 100 applicants and 1.5 MB/import. Hosted activity allows at most five active links/applicant and 200 active links/organisation; only the most recent 100 are listed. Scoring is synchronous and the frontend loads a bounded population, not a high-volume streaming platform. Unchanged assessments do not multiply history on unrelated intake. Audit records have no edit/delete API but are not tamper-evident against database administrators. Logs are bounded private local diagnostics, not cloud monitoring. API failures use safe messages with request references. Account/evidence/link retention still needs a deployment-specific policy. Hosted expiry and elapsed-duration checks limit obvious invalid reports but cannot prevent a malicious client from spoofing observations.
 

@@ -3,6 +3,7 @@ from sqlalchemy import select
 from backend.tests.test_api import client, test_db, login
 from backend.app.database import AuthSession, now
 from backend.app.auth import digest
+from backend.app.config import settings
 
 
 def test_expired_session_cannot_access_evidence(client, test_db):
@@ -51,3 +52,29 @@ def test_remote_clients_cannot_create_demo_sessions(test_db, monkeypatch):
         with pytest.raises(HTTPException) as error:
             demo_login(request, Response(), db)
     assert error.value.status_code == 403
+
+
+def test_public_sample_sessions_are_always_read_only(client, monkeypatch):
+    monkeypatch.setattr(settings, "allow_public_samples", True)
+    monkeypatch.setattr(settings, "secure_cookies", True)
+    response = client.post("/api/auth/sample", json={"role": "analyst"})
+    assert response.status_code == 200
+    assert response.json()["role"] == "viewer"
+    assert "secure" in response.headers["set-cookie"].lower()
+    assert client.get("/api/auth/config").json()["publicSampleReadOnly"] is True
+    # Secure cookies are not transmitted by an HTTP test client; send the issued
+    # test-only token explicitly to test the server's write boundary.
+    token = response.cookies.get("lens_session")
+    response = client.put("/api/cases/CASE-002/review",
+                          headers={"Cookie": "lens_session=" + token},
+                          json={"status": "Needs evidence", "note": "Not permitted", "revision": 0})
+    assert response.status_code == 403
+
+
+def test_standard_cloud_database_urls_select_the_installed_driver():
+    from backend.app.config import Settings
+    for url in ("postgres://user:secret@host/db", "postgresql://user:secret@host/db"):
+        config = Settings(_env_file=None, database_url=url)
+        assert config.database_url == "postgresql+psycopg://user:secret@host/db"
+    explicit = "postgresql+psycopg://user:secret@host/db?sslmode=require"
+    assert Settings(_env_file=None, database_url=explicit).database_url == explicit

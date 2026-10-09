@@ -127,7 +127,7 @@ def auth_config(request: Request, db: Session = Depends(get_db)):
         if error.status_code != 401:
             raise
         current = None
-    return {"mode": "sample", "user": current}
+    return {"mode": "sample", "user": current, "publicSampleReadOnly": settings.allow_public_samples}
 
 
 @app.post("/api/auth/demo", include_in_schema=False)
@@ -252,24 +252,33 @@ def report(identity_id: str, db: Session = Depends(get_db), current=Depends(user
             "thresholds": {"low": [0, 24], "review": [25, 59], "high": [60, 100]}, "scoreIsProbability": False}}
 
 
+ASSETS_SOURCE = Path(__file__).parents[2] / "frontend/public"
+
+
+def frontend_asset(name):
+    source = ASSETS_SOURCE / name
+    # Vite copies public assets into dist; serverless bundles may omit source UI files.
+    return source if source.is_file() else Path(__file__).parents[2] / "dist" / name
+
+
 @app.get("/identity-lens.js", include_in_schema=False)
 def collector_script():
-    return FileResponse(Path(__file__).parents[2] / "frontend/public/identity-lens.js", media_type="application/javascript")
+    return FileResponse(frontend_asset("identity-lens.js"), media_type="application/javascript")
 
 
 @app.get("/docs", include_in_schema=False)
 def api_reference():
-    return FileResponse(Path(__file__).parents[2] / "frontend/public/api-reference.html")
+    return FileResponse(frontend_asset("api-reference.html"))
 
 
 @app.get("/api-reference.js", include_in_schema=False)
 def reference_script():
-    return FileResponse(Path(__file__).parents[2] / "frontend/public/api-reference.js", media_type="application/javascript")
+    return FileResponse(frontend_asset("api-reference.js"), media_type="application/javascript")
 
 
 @app.get("/api-reference.css", include_in_schema=False)
 def reference_style():
-    return FileResponse(Path(__file__).parents[2] / "frontend/public/api-reference.css", media_type="text/css")
+    return FileResponse(frontend_asset("api-reference.css"), media_type="text/css")
 
 
 dist = Path(__file__).parents[2] / "dist"

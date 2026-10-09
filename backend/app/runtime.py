@@ -11,7 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from starlette.responses import JSONResponse
 from .config import settings
 
-LOG_PATH = Path(__file__).resolve().parents[2] / ".local/logs/requests.jsonl"
+LOG_ROOT = Path("/tmp/identity-lens") if os.environ.get("VERCEL") == "1" else Path(__file__).resolve().parents[2] / ".local"
+LOG_PATH = LOG_ROOT / "logs/requests.jsonl"
 log = logging.getLogger("identity_lens.requests")
 log.setLevel(logging.INFO)
 log.propagate = False
@@ -59,7 +60,7 @@ def install_runtime(app):
         response.headers["X-Frame-Options"] = "DENY"
         if request.url.path.startswith("/api"):
             response.headers["Cache-Control"] = "no-store"
-        if settings.runtime_mode == "presentation":
+        if settings.runtime_mode in ("presentation", "hosted"):
             response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
         route = request.scope.get("route")
         route_template = getattr(route, "path", "unmatched")

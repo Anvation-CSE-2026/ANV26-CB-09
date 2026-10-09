@@ -1,7 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "outputDirectory": "dist",
+  "framework": "fastapi",
   "buildCommand": "npm run build",
-  "installCommand": "npm ci --ignore-scripts"
+  "installCommand": "npm ci --ignore-scripts && uv pip install --python .vercel/python/.venv/bin/python -r requirements.txt",
+  "functions": {
+    "app.py": { "maxDuration": 60 }
+  },
+  "regions": ["sin1"]
 }

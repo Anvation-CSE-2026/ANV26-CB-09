@@ -2,6 +2,10 @@
 
 ## Start and check
 
+For the hosted presentation, open **https://identity-lens.vercel.app/**. Use **Explore sample cases** for the read-only three-case comparison, or create/sign into a hosted organisation for intake, activity collection and human review. Hosted accounts are separate from laptop accounts. No Terminal needs to stay open when using the hosted URL.
+
+For an optional local presentation, after cloning and installing dependencies:
+
 ```sh
 cd ANV26-CB-09
 npm run present
@@ -67,7 +71,7 @@ In **Method & validation**, explain the separate median/MAD reference, synthetic
 
 See README.md for every implemented layer: React/TypeScript frontend; Vite builds; Tailwind/custom CSS, Lucide and local fonts; Cytoscape graph view; Python/FastAPI/Uvicorn backend; Pydantic validation; Python rules/NumPy scoring; PostgreSQL storage; SQLAlchemy/psycopg queries; Alembic schema 006; scrypt and hashed session/link capabilities; first-party JavaScript collection; Node local proxy; private diagnostic/backup tools; Node/Vitest/pytest/Playwright verification.
 
-Supabase, Docker, Firebase, Redis, Kafka, an LLM, neural training and external verification/attestation providers are not in the running stack. The optional FastAPI/httpx external connector is not required for hosted collection. The earlier Vercel static site is not this local full-stack deployment.
+Supabase, Docker, Firebase, Redis, Kafka, an LLM, neural training and external verification/attestation providers are not in the running stack. The optional FastAPI/httpx external connector is not required for hosted collection. Vercel now hosts the frontend and Python API, with a separate Neon PostgreSQL database; this replaces the earlier static-only site.
 
 ## Judge questions
 
@@ -83,7 +87,7 @@ Supabase, Docker, Firebase, Redis, Kafka, an LLM, neural training and external v
 
 **Does a short completion mean fraud?** No. It can contribute an anomaly indicator. Other evidence, caps, missingness and human review matter. False positives and negatives remain possible.
 
-**What remains for real customers?** HTTPS Python/PostgreSQL hosting, approved evidence and validation, authorised privacy/retention and account recovery, stronger identity controls, encrypted off-device backups, load testing, monitoring and independent security review. Localhost is not publicly reachable by remote customers.
+**What remains for real customers?** Approved evidence and validation, authorised privacy/retention and account recovery, stronger identity controls, encrypted backups, load testing, monitoring and independent security review. HTTPS cloud hosting is configured, but that alone does not complete these requirements.
 
 ## If something fails
 

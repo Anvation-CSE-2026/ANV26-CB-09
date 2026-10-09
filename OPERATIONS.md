@@ -1,5 +1,7 @@
 # Local operation and recovery
 
+The public release is at **https://identity-lens.vercel.app/**, backed by a separate Neon PostgreSQL database. These local instructions do not automatically operate on that database. Cloud logs under `/tmp` are temporary; persistent evidence/audit lives in PostgreSQL. See DEPLOYMENT.md for deployment settings, secrets and migrations. Local backups have not been represented as backups of the new cloud database.
+
 These tools operate on the configured PostgreSQL database from the terminal. They are intentionally not exposed through an organisation's web account: an instance-wide backup contains every organisation's records and password hashes.
 
 ## Start for presentation
